@@ -287,6 +287,189 @@ using (
     select 1
     from public.draw_winners dw
     where dw.id = payout_transactions.winner_id
+
+      -- Admin policies for charities management
+      create policy "charities_insert_admin"
+      on public.charities
+      for insert
+      with check (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      create policy "charities_update_admin"
+      on public.charities
+      for update
+      using (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      create policy "charities_delete_admin"
+      on public.charities
+      for delete
+      using (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      -- Admin policies for draws management
+      create policy "draws_insert_admin"
+      on public.draws
+      for insert
+      with check (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      create policy "draws_update_admin"
+      on public.draws
+      for update
+      using (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      -- Admin policies for prize pool ledger
+      create policy "prize_pool_ledger_insert_admin"
+      on public.prize_pool_ledger
+      for insert
+      with check (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      -- Admin policies for winner verifications (review/approve)
+      create policy "winner_verifications_select_admin"
+      on public.winner_verifications
+      for select
+      using (
+        auth.uid() is null or
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      create policy "winner_verifications_update_admin"
+      on public.winner_verifications
+      for update
+      using (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      )
+      with check (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      -- Admin policies for payout transactions
+      create policy "payout_transactions_insert_admin"
+      on public.payout_transactions
+      for insert
+      with check (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      create policy "payout_transactions_update_admin"
+      on public.payout_transactions
+      for update
+      using (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      -- Webhook event logs - backend service role only (no frontend access)
+      create policy "webhook_event_logs_select_admin"
+      on public.webhook_event_logs
+      for select
+      using (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      -- Admin can view all user subscriptions for dashboard
+      create policy "subscriptions_select_admin"
+      on public.subscriptions
+      for select
+      using (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      -- Admin can view all draw participants
+      create policy "draw_participants_select_admin"
+      on public.draw_participants
+      for select
+      using (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      -- Admin can view all draw winners
+      create policy "draw_winners_select_admin"
+      on public.draw_winners
+      for select
+      using (
+        exists (
+          select 1
+          from public.profiles
+          where id = auth.uid() and role = 'admin'
+        )
+      );
+
+      -- Admin can view profiles for user management
+      create policy "profiles_select_admin"
+      on public.profiles
+      for select
+      using (
+        exists (
+          select 1
+          from public.profiles p2
+          where p2.id = auth.uid() and p2.role = 'admin'
+        )
+      );
       and dw.user_id = auth.uid()
   )
 );
