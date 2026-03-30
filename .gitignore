@@ -1,0 +1,76 @@
+# OS Files
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# IDE
+*.sublime-workspace
+*.sublime-project
+
+# Project-specific
+PRD Full Stack Training.pdf
+
+# Local environment files (keep .example files as templates)
+.env
+.env.local
+.env.*.local
+.env.production.local
+
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+yarn.lock
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.turbo/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS temporary files
+Thumbs.db
+ehthumbs.db
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Vercel
+.vercel
+
+# Render
+render-build.log
+
+# Git
+.git/
+.gitattributes
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+
+# Misc
+.DS_Store
+*.pem
+*.key
+*.cer
+*.crt
