@@ -40,39 +40,45 @@ export default async function Home() {
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-10 md:px-10 md:py-14">
-      <section className="rounded-3xl border border-brand/20 bg-surface p-8 shadow-[0_20px_65px_rgba(13,23,40,0.08)] md:p-12">
-        <p className="mb-4 inline-flex rounded-full bg-brand/10 px-4 py-1 text-sm font-semibold text-brand">
-          Live v1 Platform
-        </p>
-        <h1 className="max-w-3xl text-4xl leading-tight text-foreground md:text-6xl">
-          Golf performance, monthly draws, and charity impact in one subscription platform.
+      <section className="ui-panel p-8 md:p-12">
+        <p className="ui-kicker">Golf Subscription + Draw + Charity</p>
+        <h1 className="mt-3 max-w-4xl text-4xl leading-tight text-foreground md:text-6xl">
+          Track scores, join monthly prize draws, and fund real charity impact in one product.
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-foreground/75">
-          Track your latest Stableford scores, join monthly draws, support your chosen charity, and manage verification
-          and payouts through dedicated subscriber and admin workflows.
+        <p className="ui-subtitle mt-5 max-w-3xl text-lg leading-8">
+          For golf subscribers and club communities: maintain your latest Stableford performance, participate in
+          transparent draw mechanics, and route a guaranteed share to your chosen charity.
         </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <span className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white">Next.js 16</span>
-          <span className="rounded-full bg-brand-2 px-4 py-2 text-sm font-semibold text-white">TypeScript</span>
-          <span className="rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-white">Supabase</span>
-          <span className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-foreground">Razorpay</span>
-        </div>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href={user ? "/dashboard" : "/login"} className="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white">
-            {user ? "Open Dashboard" : "Login / Signup"}
+            {user ? "Open My Dashboard" : "Start Free Account"}
           </Link>
           <Link href="/dashboard" className="rounded-xl bg-foreground px-4 py-2 text-sm font-semibold text-white">
-            Subscriber Dashboard
+            Subscriber Workflow
           </Link>
           <Link href="/charities" className="rounded-xl bg-brand-2 px-4 py-2 text-sm font-semibold text-white">
-            Explore Charities
+            Explore Partner Charities
           </Link>
           <Link href="/draws" className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-foreground">
-            View Draw Results
+            Browse Draw Results
           </Link>
           <Link href="/impact" className="rounded-xl border border-foreground/20 px-4 py-2 text-sm font-semibold text-foreground">
-            Community Impact
+            Impact Transparency
           </Link>
+        </div>
+        <div className="mt-6 grid gap-3 md:grid-cols-3">
+          <div className="ui-card p-3">
+            <p className="text-xs uppercase tracking-wide text-foreground/55">Who this is for</p>
+            <p className="mt-1 text-sm text-foreground/80">Golf subscribers, clubs, and admins running audited monthly draw programs.</p>
+          </div>
+          <div className="ui-card p-3">
+            <p className="text-xs uppercase tracking-wide text-foreground/55">What it solves</p>
+            <p className="mt-1 text-sm text-foreground/80">One workflow for score retention, draw logic, verification, payout state, and charity allocation.</p>
+          </div>
+          <div className="ui-card p-3">
+            <p className="text-xs uppercase tracking-wide text-foreground/55">First action</p>
+            <p className="mt-1 text-sm text-foreground/80">Create account, choose charity %, activate subscription, then add scores.</p>
+          </div>
         </div>
       </section>
 

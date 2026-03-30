@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import cors from "cors";
 import express from "express";
@@ -10,7 +12,7 @@ import { sendDrawPublishedNotifications, sendSubscriptionStatusEmail } from "./n
 import { getRazorpayClient, isRazorpayConfigured } from "./razorpay.js";
 import { supabaseAdmin } from "./supabase.js";
 
-const app = express();
+export const app = express();
 
 function isInternalAuthorized(req: express.Request) {
   const secret = req.header("x-internal-secret");
@@ -729,6 +731,11 @@ app.post("/api/billing/webhook", async (req, res) => {
   return res.status(200).json({ ok: true, event: event.event ?? "unknown" });
 });
 
-app.listen(env.PORT, () => {
-  console.log(`Backend listening on port ${env.PORT}`);
-});
+const modulePath = fileURLToPath(import.meta.url);
+const entryPath = process.argv[1] ? path.resolve(process.argv[1]) : "";
+
+if (entryPath && modulePath === entryPath) {
+  app.listen(env.PORT, () => {
+    console.log(`Backend listening on port ${env.PORT}`);
+  });
+}

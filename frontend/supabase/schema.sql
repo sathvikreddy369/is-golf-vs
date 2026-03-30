@@ -105,6 +105,15 @@ create table if not exists public.score_entries (
 );
 
 create index if not exists score_entries_user_created_idx on public.score_entries(user_id, created_at desc);
+create index if not exists subscriptions_user_created_idx on public.subscriptions(user_id, created_at desc);
+create index if not exists subscriptions_status_idx on public.subscriptions(status);
+create index if not exists draws_status_month_idx on public.draws(status, draw_month desc);
+create index if not exists draw_winners_user_created_idx on public.draw_winners(user_id, created_at desc);
+create index if not exists draw_winners_draw_idx on public.draw_winners(draw_id);
+create index if not exists draw_participants_user_idx on public.draw_participants(user_id);
+create index if not exists winner_verifications_status_idx on public.winner_verifications(status, created_at desc);
+create index if not exists payout_transactions_status_idx on public.payout_transactions(status, created_at desc);
+create index if not exists user_charity_preferences_charity_idx on public.user_charity_preferences(charity_id);
 
 create or replace function public.enforce_latest_five_scores()
 returns trigger
@@ -123,6 +132,8 @@ begin
   return new;
 end;
 $$;
+
+drop trigger if exists trg_enforce_latest_five_scores on public.score_entries;
 
 create trigger trg_enforce_latest_five_scores
 after insert on public.score_entries
