@@ -81,9 +81,12 @@ async function runSimulation(formData: FormData) {
   await assertAdmin();
 
   const mode = String(formData.get("mode") ?? "random");
-  await postInternal("/api/internal/admin/draw/simulate", { mode });
+  const response = await postInternal("/api/internal/admin/draw/simulate", { mode });
+  const data = (await response.json()) as { drawId?: string };
 
-  redirect("/admin?success=Draw%20simulation%20completed");
+  const drawId = data.drawId ?? "";
+  const suffix = drawId ? `&simulatedDrawId=${encodeURIComponent(drawId)}` : "";
+  redirect(`/admin?success=Draw%20simulation%20completed${suffix}`);
 }
 
 async function publishDraw(formData: FormData) {
@@ -197,63 +200,134 @@ type AdminPageProps = {
   searchParams: Promise<{
     error?: string;
     success?: string;
+    simulatedDrawId?: string;
+    usersPage?: string;
+    subscriptionsPage?: string;
+    scoresPage?: string;
+    verificationsPage?: string;
+    winnersPage?: string;
+    drawsPage?: string;
   }>;
 };
 
+const PAGE_SIZE = {
+  draws: 6,
+  verifications: 12,
+  winners: 20,
+  users: 20,
+  subscriptions: 20,
+  scores: 20,
+} as const;
+
+function toPage(value: string | undefined) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return 1;
+  }
+  return parsed;
+}
+
+function pageHref(
+  params: Record<string, string | undefined>,
+  updates: Record<string, string>,
+) {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) {
+      search.set(key, value);
+    }
+  });
+  Object.entries(updates).forEach(([key, value]) => {
+    search.set(key, value);
+  });
+  const query = search.toString();
+  return query ? `/admin?${query}` : "/admin";
+}
+
 export default async function AdminPage({ searchParams }: AdminPageProps) {
-  const { error, success } = await searchParams;
+  const {
+    error,
+    success,
+    simulatedDrawId,
+    usersPage: usersPageRaw,
+    subscriptionsPage: subscriptionsPageRaw,
+    scoresPage: scoresPageRaw,
+    verificationsPage: verificationsPageRaw,
+    winnersPage: winnersPageRaw,
+    drawsPage: drawsPageRaw,
+  } = await searchParams;
+
+  const usersPage = toPage(usersPageRaw);
+  const subscriptionsPage = toPage(subscriptionsPageRaw);
+  const scoresPage = toPage(scoresPageRaw);
+  const verificationsPage = toPage(verificationsPageRaw);
+  const winnersPage = toPage(winnersPageRaw);
+  const drawsPage = toPage(drawsPageRaw);
+
+  const drawStart = (drawsPage - 1) * PAGE_SIZE.draws;
+  const verificationStart = (verificationsPage - 1) * PAGE_SIZE.verifications;
+  const winnerStart = (winnersPage - 1) * PAGE_SIZE.winners;
+  const usersStart = (usersPage - 1) * PAGE_SIZE.users;
+  const subscriptionsStart = (subscriptionsPage - 1) * PAGE_SIZE.subscriptions;
+  const scoresStart = (scoresPage - 1) * PAGE_SIZE.scores;
+
   const { profile, user } = await assertAdmin();
 
   const adminClient = createAdminClient();
 
   const [
     { data: charities },
-    { data: draws },
-    { data: verifications },
-    { data: winners },
+    { data: draws, count: drawsCount },
+    { data: verifications, count: verificationsCount },
+    { data: winners, count: winnersListCount },
     { count: usersCount },
     { data: ledgers },
-    { data: profiles },
-    { data: subscriptions },
-    { data: recentScores },
+    { data: profiles, count: profilesCount },
+    { data: subscriptions, count: subscriptionsCount },
+    { data: recentScores, count: scoresCount },
     { data: charityPrefs },
     { count: publishedDrawCount },
     { count: winnersCount },
     { data: analyticsSubscriptions },
+    { data: simulatedDraw },
   ] = await Promise.all([
     adminClient.from("charities").select("id, name, slug").order("name", { ascending: true }),
     adminClient
       .from("draws")
-      .select("id, draw_month, mode, status, winning_numbers")
+      .select("id, draw_month, mode, status, winning_numbers", { count: "exact" })
       .order("draw_month", { ascending: false })
-      .limit(6),
+      .range(drawStart, drawStart + PAGE_SIZE.draws - 1),
     adminClient
       .from("winner_verifications")
-      .select("id, status, proof_file_url, review_notes")
+      .select("id, status, proof_file_url, review_notes", { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(12),
+      .range(verificationStart, verificationStart + PAGE_SIZE.verifications - 1),
     adminClient
       .from("draw_winners")
-      .select("id, tier, prize_cents, payout_status")
+      .select("id, tier, prize_cents, payout_status", { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(20),
+      .range(winnerStart, winnerStart + PAGE_SIZE.winners - 1),
     adminClient.from("profiles").select("id", { count: "exact", head: true }),
     adminClient
       .from("prize_pool_ledger")
       .select("total_pool_cents, rollover_out_cents")
       .order("created_at", { ascending: false })
       .limit(12),
-    adminClient.from("profiles").select("id, full_name, role").order("created_at", { ascending: false }).limit(20),
+    adminClient
+      .from("profiles")
+      .select("id, full_name, role", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(usersStart, usersStart + PAGE_SIZE.users - 1),
     adminClient
       .from("subscriptions")
-      .select("id, user_id, status, plan_interval, current_period_end")
+      .select("id, user_id, status, plan_interval, current_period_end", { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(20),
+      .range(subscriptionsStart, subscriptionsStart + PAGE_SIZE.subscriptions - 1),
     adminClient
       .from("score_entries")
-      .select("id, user_id, stableford_score, score_date")
+      .select("id, user_id, stableford_score, score_date", { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(20),
+      .range(scoresStart, scoresStart + PAGE_SIZE.scores - 1),
     adminClient.from("user_charity_preferences").select("user_id, charity_id, contribution_percent"),
     adminClient.from("draws").select("id", { count: "exact", head: true }).eq("status", "published"),
     adminClient.from("draw_winners").select("id", { count: "exact", head: true }),
@@ -261,6 +335,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .from("subscriptions")
       .select("user_id, amount_cents, status, created_at")
       .order("created_at", { ascending: false }),
+    simulatedDrawId
+      ? adminClient
+          .from("draws")
+          .select("id, draw_month, mode, winning_numbers, status")
+          .eq("id", simulatedDrawId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const totalPrizePool = (ledgers ?? []).reduce((acc, l) => acc + l.total_pool_cents, 0);
@@ -302,6 +383,18 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     .filter((row) => row.contributionCents > 0)
     .sort((a, b) => b.contributionCents - a.contributionCents)
     .slice(0, 8);
+
+  const currentParams = {
+    error,
+    success,
+    simulatedDrawId,
+    usersPage: String(usersPage),
+    subscriptionsPage: String(subscriptionsPage),
+    scoresPage: String(scoresPage),
+    verificationsPage: String(verificationsPage),
+    winnersPage: String(winnersPage),
+    drawsPage: String(drawsPage),
+  };
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-6 py-10 md:px-10 md:py-14">
@@ -361,6 +454,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         {success ? (
           <p className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</p>
         ) : null}
+        {simulatedDraw ? (
+          <div className="mt-4 rounded-xl border border-brand/25 bg-brand/10 px-4 py-3 text-sm text-foreground">
+            <p className="font-semibold">
+              Latest simulation: {simulatedDraw.draw_month} ({simulatedDraw.mode})
+            </p>
+            <p className="mt-1 text-foreground/80">
+              Winning numbers: {simulatedDraw.winning_numbers.join(", ")} | status: {simulatedDraw.status}
+            </p>
+          </div>
+        ) : null}
       </section>
 
       <section className="mt-6 grid gap-6 xl:grid-cols-2">
@@ -398,6 +501,29 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 ) : null}
               </div>
             ))}
+          </div>
+          <div className="mt-4 flex items-center justify-between text-xs text-foreground/70">
+            <span>
+              Page {drawsPage} of {Math.max(1, Math.ceil((drawsCount ?? 0) / PAGE_SIZE.draws))}
+            </span>
+            <div className="flex gap-2">
+              {drawsPage > 1 ? (
+                <Link
+                  className="rounded-lg border border-foreground/20 px-3 py-1"
+                  href={pageHref(currentParams, { drawsPage: String(drawsPage - 1) })}
+                >
+                  Previous
+                </Link>
+              ) : null}
+              {drawsPage * PAGE_SIZE.draws < (drawsCount ?? 0) ? (
+                <Link
+                  className="rounded-lg border border-foreground/20 px-3 py-1"
+                  href={pageHref(currentParams, { drawsPage: String(drawsPage + 1) })}
+                >
+                  Next
+                </Link>
+              ) : null}
+            </div>
           </div>
         </article>
 
@@ -455,6 +581,27 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
       </section>
 
+      <section className="mt-6 rounded-3xl border border-foreground/10 bg-surface p-6">
+        <h2 className="text-2xl">Reports and Exports</h2>
+        <p className="mt-1 text-sm text-foreground/70">
+          Download CSV exports for audit, finance, and operations review.
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Link className="rounded-xl border border-foreground/20 bg-white px-4 py-3 text-sm font-semibold" href="/admin/reports?type=users">
+            Export Users
+          </Link>
+          <Link className="rounded-xl border border-foreground/20 bg-white px-4 py-3 text-sm font-semibold" href="/admin/reports?type=subscriptions">
+            Export Subscriptions
+          </Link>
+          <Link className="rounded-xl border border-foreground/20 bg-white px-4 py-3 text-sm font-semibold" href="/admin/reports?type=winners">
+            Export Winners
+          </Link>
+          <Link className="rounded-xl border border-foreground/20 bg-white px-4 py-3 text-sm font-semibold" href="/admin/reports?type=verifications">
+            Export Verifications
+          </Link>
+        </div>
+      </section>
+
       <section className="mt-6 grid gap-6 xl:grid-cols-2">
         <article className="rounded-3xl border border-foreground/10 bg-surface p-6">
           <h2 className="text-2xl">Winner Verification</h2>
@@ -479,6 +626,29 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
             ))}
           </div>
+          <div className="mt-4 flex items-center justify-between text-xs text-foreground/70">
+            <span>
+              Page {verificationsPage} of {Math.max(1, Math.ceil((verificationsCount ?? 0) / PAGE_SIZE.verifications))}
+            </span>
+            <div className="flex gap-2">
+              {verificationsPage > 1 ? (
+                <Link
+                  className="rounded-lg border border-foreground/20 px-3 py-1"
+                  href={pageHref(currentParams, { verificationsPage: String(verificationsPage - 1) })}
+                >
+                  Previous
+                </Link>
+              ) : null}
+              {verificationsPage * PAGE_SIZE.verifications < (verificationsCount ?? 0) ? (
+                <Link
+                  className="rounded-lg border border-foreground/20 px-3 py-1"
+                  href={pageHref(currentParams, { verificationsPage: String(verificationsPage + 1) })}
+                >
+                  Next
+                </Link>
+              ) : null}
+            </div>
+          </div>
         </article>
 
         <article className="rounded-3xl border border-foreground/10 bg-surface p-6">
@@ -500,6 +670,29 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
             ))}
           </div>
+          <div className="mt-4 flex items-center justify-between text-xs text-foreground/70">
+            <span>
+              Page {winnersPage} of {Math.max(1, Math.ceil((winnersListCount ?? 0) / PAGE_SIZE.winners))}
+            </span>
+            <div className="flex gap-2">
+              {winnersPage > 1 ? (
+                <Link
+                  className="rounded-lg border border-foreground/20 px-3 py-1"
+                  href={pageHref(currentParams, { winnersPage: String(winnersPage - 1) })}
+                >
+                  Previous
+                </Link>
+              ) : null}
+              {winnersPage * PAGE_SIZE.winners < (winnersListCount ?? 0) ? (
+                <Link
+                  className="rounded-lg border border-foreground/20 px-3 py-1"
+                  href={pageHref(currentParams, { winnersPage: String(winnersPage + 1) })}
+                >
+                  Next
+                </Link>
+              ) : null}
+            </div>
+          </div>
         </article>
       </section>
 
@@ -520,6 +713,29 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </div>
               </form>
             ))}
+          </div>
+          <div className="mt-4 flex items-center justify-between text-xs text-foreground/70">
+            <span>
+              Page {usersPage} of {Math.max(1, Math.ceil((profilesCount ?? 0) / PAGE_SIZE.users))}
+            </span>
+            <div className="flex gap-2">
+              {usersPage > 1 ? (
+                <Link
+                  className="rounded-lg border border-foreground/20 px-3 py-1"
+                  href={pageHref(currentParams, { usersPage: String(usersPage - 1) })}
+                >
+                  Previous
+                </Link>
+              ) : null}
+              {usersPage * PAGE_SIZE.users < (profilesCount ?? 0) ? (
+                <Link
+                  className="rounded-lg border border-foreground/20 px-3 py-1"
+                  href={pageHref(currentParams, { usersPage: String(usersPage + 1) })}
+                >
+                  Next
+                </Link>
+              ) : null}
+            </div>
           </div>
         </article>
 
@@ -544,6 +760,29 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </form>
             ))}
           </div>
+          <div className="mt-4 flex items-center justify-between text-xs text-foreground/70">
+            <span>
+              Page {subscriptionsPage} of {Math.max(1, Math.ceil((subscriptionsCount ?? 0) / PAGE_SIZE.subscriptions))}
+            </span>
+            <div className="flex gap-2">
+              {subscriptionsPage > 1 ? (
+                <Link
+                  className="rounded-lg border border-foreground/20 px-3 py-1"
+                  href={pageHref(currentParams, { subscriptionsPage: String(subscriptionsPage - 1) })}
+                >
+                  Previous
+                </Link>
+              ) : null}
+              {subscriptionsPage * PAGE_SIZE.subscriptions < (subscriptionsCount ?? 0) ? (
+                <Link
+                  className="rounded-lg border border-foreground/20 px-3 py-1"
+                  href={pageHref(currentParams, { subscriptionsPage: String(subscriptionsPage + 1) })}
+                >
+                  Next
+                </Link>
+              ) : null}
+            </div>
+          </div>
         </article>
 
         <article className="rounded-3xl border border-foreground/10 bg-surface p-6">
@@ -560,6 +799,29 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </div>
               </form>
             ))}
+          </div>
+          <div className="mt-4 flex items-center justify-between text-xs text-foreground/70">
+            <span>
+              Page {scoresPage} of {Math.max(1, Math.ceil((scoresCount ?? 0) / PAGE_SIZE.scores))}
+            </span>
+            <div className="flex gap-2">
+              {scoresPage > 1 ? (
+                <Link
+                  className="rounded-lg border border-foreground/20 px-3 py-1"
+                  href={pageHref(currentParams, { scoresPage: String(scoresPage - 1) })}
+                >
+                  Previous
+                </Link>
+              ) : null}
+              {scoresPage * PAGE_SIZE.scores < (scoresCount ?? 0) ? (
+                <Link
+                  className="rounded-lg border border-foreground/20 px-3 py-1"
+                  href={pageHref(currentParams, { scoresPage: String(scoresPage + 1) })}
+                >
+                  Next
+                </Link>
+              ) : null}
+            </div>
           </div>
         </article>
       </section>

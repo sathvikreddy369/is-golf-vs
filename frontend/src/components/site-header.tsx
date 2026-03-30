@@ -18,7 +18,7 @@ export default async function SiteHeader() {
           </Link>
         </div>
 
-        <nav className="flex flex-wrap items-center gap-2 md:gap-3">
+        <nav className="hidden items-center gap-2 md:flex md:gap-3">
           <Link href="/" className="rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-surface-alt">
             Home
           </Link>
@@ -48,6 +48,42 @@ export default async function SiteHeader() {
             {user ? "Open App" : "Login"}
           </Link>
         </nav>
+
+        <details className="group relative md:hidden">
+          <summary className="list-none rounded-lg border border-foreground/15 bg-white px-3 py-2 text-sm font-semibold text-foreground/80">
+            Menu
+          </summary>
+          <nav className="absolute right-0 mt-2 flex w-64 flex-col gap-1 rounded-xl border border-foreground/10 bg-surface-elevated p-2 shadow-lg">
+            <Link href="/" className="rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-surface-alt">
+              Home
+            </Link>
+            <Link href="/charities" className="rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-surface-alt">
+              Charities
+            </Link>
+            <Link href="/draws" className="rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-surface-alt">
+              Draws
+            </Link>
+            <Link href="/impact" className="rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-surface-alt">
+              Impact & Transparency
+            </Link>
+            {user ? (
+              <>
+                <Link href="/dashboard" className="rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-surface-alt">
+                  Dashboard
+                </Link>
+                <Link href="/admin" className="rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-surface-alt">
+                  Admin
+                </Link>
+              </>
+            ) : null}
+            <Link
+              href={user ? "/dashboard" : "/login"}
+              className="mt-1 rounded-lg bg-brand px-3 py-2 text-center text-sm font-semibold text-white"
+            >
+              {user ? "Open App" : "Login"}
+            </Link>
+          </nav>
+        </details>
       </div>
     </header>
   );

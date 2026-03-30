@@ -40,7 +40,7 @@ export default async function Home() {
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-10 md:px-10 md:py-14">
-      <section className="ui-panel p-8 md:p-12">
+      <section className="ui-panel reveal-up p-8 md:p-12">
         <p className="ui-kicker">Golf Subscription + Draw + Charity</p>
         <h1 className="mt-3 max-w-4xl text-4xl leading-tight text-foreground md:text-6xl">
           Track scores, join monthly prize draws, and fund real charity impact in one product.
@@ -82,7 +82,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="mt-8 grid gap-4 md:grid-cols-3">
+      <section className="reveal-up delay-1 mt-8 grid gap-4 md:grid-cols-3">
         <article className="rounded-2xl border border-foreground/10 bg-surface-alt p-6">
           <p className="text-sm text-foreground/60">Published Draws</p>
           <h2 className="mt-1 text-3xl font-semibold">{publishedDrawCount ?? 0}</h2>
@@ -102,7 +102,7 @@ export default async function Home() {
         </article>
       </section>
 
-      <section className="mt-8 rounded-2xl border border-foreground/10 bg-surface p-6 md:p-8">
+      <section className="reveal-up delay-1 mt-8 rounded-2xl border border-foreground/10 bg-surface p-6 md:p-8">
         <h2 className="text-3xl">How Monthly Draws Work</h2>
         <ol className="mt-3 list-decimal space-y-2 pl-6 text-foreground/80">
           <li>Subscribers enter and maintain their latest 5 Stableford scores.</li>
@@ -112,7 +112,7 @@ export default async function Home() {
         </ol>
       </section>
 
-      <section className="mt-8 rounded-2xl border border-foreground/10 bg-surface p-6 md:p-8">
+      <section className="reveal-up delay-2 mt-8 rounded-2xl border border-foreground/10 bg-surface p-6 md:p-8">
         <h2 className="text-3xl">Recent Published Draws</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {(recentPublishedDraws ?? []).map((draw) => (
@@ -128,7 +128,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="mt-8 rounded-2xl border border-foreground/10 bg-surface-alt p-6 md:p-8">
+      <section className="reveal-up delay-2 mt-8 rounded-2xl border border-foreground/10 bg-surface-alt p-6 md:p-8">
         <h2 className="text-3xl">Featured Charity Spotlight</h2>
         <p className="mt-2 text-foreground/75">Support impact-first causes highlighted by the community.</p>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
@@ -147,7 +147,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="mt-8 rounded-2xl border border-dashed border-foreground/25 p-6 md:p-8">
+      <section className="reveal-up delay-3 mt-8 rounded-2xl border border-dashed border-foreground/25 p-6 md:p-8">
         <h2 className="text-3xl">Get Started</h2>
         <ol className="mt-4 list-decimal space-y-2 pl-6 text-foreground/80">
           <li>Create your account and confirm your email.</li>

@@ -14,6 +14,27 @@ import { supabaseAdmin } from "./supabase.js";
 
 export const app = express();
 
+const MAX_PROOF_FILE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_PROOF_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+function csvEscape(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  const raw = String(value);
+  if (/[",\n]/.test(raw)) {
+    return `"${raw.replace(/"/g, '""')}"`;
+  }
+  return raw;
+}
+
+function toCsv(headers: string[], rows: Array<Record<string, unknown>>) {
+  const headerRow = headers.join(",");
+  const bodyRows = rows.map((row) => headers.map((header) => csvEscape(row[header])).join(","));
+  return [headerRow, ...bodyRows].join("\n");
+}
+
 function isInternalAuthorized(req: express.Request) {
   const secret = req.header("x-internal-secret");
   return Boolean(env.BACKEND_INTERNAL_API_SECRET && secret === env.BACKEND_INTERNAL_API_SECRET);
@@ -106,8 +127,20 @@ app.post("/api/internal/winner-proof/upsert", async (req, res) => {
   let finalProofUrl = proofUrl ?? "";
 
   if (proofFileBase64) {
+    if (!proofMimeType || !ALLOWED_PROOF_MIME_TYPES.has(proofMimeType)) {
+      return res.status(400).json({ error: "Proof file must be PNG, JPEG, or WEBP" });
+    }
+
     const bytes = Buffer.from(proofFileBase64, "base64");
-    const ext = proofFileExtension || "png";
+    if (!bytes.length || bytes.length > MAX_PROOF_FILE_BYTES) {
+      return res.status(400).json({ error: "Proof file size must be between 1 byte and 10MB" });
+    }
+
+    const ext = (proofFileExtension || "png").toLowerCase();
+    if (!/^[a-z0-9]{2,8}$/.test(ext)) {
+      return res.status(400).json({ error: "Invalid proof file extension" });
+    }
+
     const objectPath = `${userId}/${winnerId}-${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabaseAdmin.storage
@@ -344,9 +377,17 @@ app.post("/api/internal/admin/charity/delete", async (req, res) => {
 });
 
 async function simulateMonthlyDraw(mode: DrawMode) {
+  const scoreCutoffDate = new Date();
+  scoreCutoffDate.setUTCMonth(scoreCutoffDate.getUTCMonth() - 18);
+
   const [{ data: subscriptions }, { data: allScores }, { data: recentDraw }] = await Promise.all([
     supabaseAdmin.from("subscriptions").select("user_id, amount_cents").eq("status", "active"),
-    supabaseAdmin.from("score_entries").select("user_id, stableford_score, score_date").order("score_date", { ascending: false }),
+    supabaseAdmin
+      .from("score_entries")
+      .select("user_id, stableford_score, score_date")
+      .gte("score_date", scoreCutoffDate.toISOString().slice(0, 10))
+      .order("score_date", { ascending: false })
+      .limit(50000),
     supabaseAdmin
       .from("draws")
       .select("id, rollover_cents")
@@ -573,6 +614,92 @@ app.post("/api/internal/admin/payout/mark-paid", async (req, res) => {
     return res.status(500).json({ error: winnerError?.message ?? payoutError?.message ?? "Payout failed" });
   }
   return res.status(200).json({ ok: true });
+});
+
+app.get("/api/internal/admin/reports/export", async (req, res) => {
+  if (!isInternalAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
+
+  const parsed = z
+    .object({
+      type: z.enum(["users", "subscriptions", "winners", "verifications"]),
+    })
+    .safeParse(req.query);
+
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
+  }
+
+  const { type } = parsed.data;
+
+  if (type === "users") {
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select("id, full_name, role, created_at")
+      .order("created_at", { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+
+    const csv = toCsv(["id", "full_name", "role", "created_at"], (data ?? []) as Array<Record<string, unknown>>);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="users-report-${Date.now()}.csv"`);
+    return res.status(200).send(csv);
+  }
+
+  if (type === "subscriptions") {
+    const { data, error } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id, user_id, provider_subscription_id, plan_interval, status, amount_cents, started_at, current_period_end, canceled_at, created_at")
+      .order("created_at", { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+
+    const csv = toCsv(
+      [
+        "id",
+        "user_id",
+        "provider_subscription_id",
+        "plan_interval",
+        "status",
+        "amount_cents",
+        "started_at",
+        "current_period_end",
+        "canceled_at",
+        "created_at",
+      ],
+      (data ?? []) as Array<Record<string, unknown>>,
+    );
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="subscriptions-report-${Date.now()}.csv"`);
+    return res.status(200).send(csv);
+  }
+
+  if (type === "winners") {
+    const { data, error } = await supabaseAdmin
+      .from("draw_winners")
+      .select("id, draw_id, user_id, tier, prize_cents, payout_status, created_at")
+      .order("created_at", { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+
+    const csv = toCsv(
+      ["id", "draw_id", "user_id", "tier", "prize_cents", "payout_status", "created_at"],
+      (data ?? []) as Array<Record<string, unknown>>,
+    );
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="winners-report-${Date.now()}.csv"`);
+    return res.status(200).send(csv);
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("winner_verifications")
+    .select("id, winner_id, status, proof_file_url, reviewed_by, reviewed_at, review_notes, created_at")
+    .order("created_at", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const csv = toCsv(
+    ["id", "winner_id", "status", "proof_file_url", "reviewed_by", "reviewed_at", "review_notes", "created_at"],
+    (data ?? []) as Array<Record<string, unknown>>,
+  );
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="verifications-report-${Date.now()}.csv"`);
+  return res.status(200).send(csv);
 });
 
 app.post("/api/internal/cron/monthly-draw", async (req, res) => {
