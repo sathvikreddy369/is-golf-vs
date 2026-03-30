@@ -2,13 +2,54 @@
 
 create extension if not exists pgcrypto;
 
-create type public.user_role as enum ('subscriber', 'admin');
-create type public.subscription_status as enum ('inactive', 'active', 'past_due', 'canceled', 'lapsed');
-create type public.draw_status as enum ('scheduled', 'simulated', 'published');
-create type public.draw_mode as enum ('random', 'weighted');
-create type public.match_tier as enum ('match_5', 'match_4', 'match_3');
-create type public.verification_status as enum ('pending', 'approved', 'rejected');
-create type public.payout_status as enum ('pending', 'paid');
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'user_role') then
+    create type public.user_role as enum ('subscriber', 'admin');
+  end if;
+end$$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'subscription_status') then
+    create type public.subscription_status as enum ('inactive', 'active', 'past_due', 'canceled', 'lapsed');
+  end if;
+end$$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'draw_status') then
+    create type public.draw_status as enum ('scheduled', 'simulated', 'published');
+  end if;
+end$$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'draw_mode') then
+    create type public.draw_mode as enum ('random', 'weighted');
+  end if;
+end$$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'match_tier') then
+    create type public.match_tier as enum ('match_5', 'match_4', 'match_3');
+  end if;
+end$$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'verification_status') then
+    create type public.verification_status as enum ('pending', 'approved', 'rejected');
+  end if;
+end$$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'payout_status') then
+    create type public.payout_status as enum ('pending', 'paid');
+  end if;
+end$$;
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -176,6 +217,7 @@ alter table public.draw_participants enable row level security;
 alter table public.draw_winners enable row level security;
 alter table public.winner_verifications enable row level security;
 alter table public.payout_transactions enable row level security;
+alter table public.webhook_event_logs enable row level security;
 
 create policy "profiles_select_own"
 on public.profiles
@@ -287,189 +329,199 @@ using (
     select 1
     from public.draw_winners dw
     where dw.id = payout_transactions.winner_id
-
-      -- Admin policies for charities management
-      create policy "charities_insert_admin"
-      on public.charities
-      for insert
-      with check (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      create policy "charities_update_admin"
-      on public.charities
-      for update
-      using (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      create policy "charities_delete_admin"
-      on public.charities
-      for delete
-      using (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      -- Admin policies for draws management
-      create policy "draws_insert_admin"
-      on public.draws
-      for insert
-      with check (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      create policy "draws_update_admin"
-      on public.draws
-      for update
-      using (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      -- Admin policies for prize pool ledger
-      create policy "prize_pool_ledger_insert_admin"
-      on public.prize_pool_ledger
-      for insert
-      with check (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      -- Admin policies for winner verifications (review/approve)
-      create policy "winner_verifications_select_admin"
-      on public.winner_verifications
-      for select
-      using (
-        auth.uid() is null or
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      create policy "winner_verifications_update_admin"
-      on public.winner_verifications
-      for update
-      using (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      )
-      with check (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      -- Admin policies for payout transactions
-      create policy "payout_transactions_insert_admin"
-      on public.payout_transactions
-      for insert
-      with check (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      create policy "payout_transactions_update_admin"
-      on public.payout_transactions
-      for update
-      using (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      -- Webhook event logs - backend service role only (no frontend access)
-      create policy "webhook_event_logs_select_admin"
-      on public.webhook_event_logs
-      for select
-      using (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      -- Admin can view all user subscriptions for dashboard
-      create policy "subscriptions_select_admin"
-      on public.subscriptions
-      for select
-      using (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      -- Admin can view all draw participants
-      create policy "draw_participants_select_admin"
-      on public.draw_participants
-      for select
-      using (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      -- Admin can view all draw winners
-      create policy "draw_winners_select_admin"
-      on public.draw_winners
-      for select
-      using (
-        exists (
-          select 1
-          from public.profiles
-          where id = auth.uid() and role = 'admin'
-        )
-      );
-
-      -- Admin can view profiles for user management
-      create policy "profiles_select_admin"
-      on public.profiles
-      for select
-      using (
-        exists (
-          select 1
-          from public.profiles p2
-          where p2.id = auth.uid() and p2.role = 'admin'
-        )
-      );
       and dw.user_id = auth.uid()
+  )
+);
+
+create policy "charities_insert_admin"
+on public.charities
+for insert
+with check (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "charities_update_admin"
+on public.charities
+for update
+using (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "charities_delete_admin"
+on public.charities
+for delete
+using (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "draws_insert_admin"
+on public.draws
+for insert
+with check (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "draws_update_admin"
+on public.draws
+for update
+using (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "prize_pool_ledger_insert_admin"
+on public.prize_pool_ledger
+for insert
+with check (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "winner_verifications_select_admin"
+on public.winner_verifications
+for select
+using (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "winner_verifications_update_admin"
+on public.winner_verifications
+for update
+using (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "payout_transactions_insert_admin"
+on public.payout_transactions
+for insert
+with check (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "payout_transactions_update_admin"
+on public.payout_transactions
+for update
+using (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "webhook_event_logs_select_admin"
+on public.webhook_event_logs
+for select
+using (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "subscriptions_select_admin"
+on public.subscriptions
+for select
+using (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "draw_participants_select_admin"
+on public.draw_participants
+for select
+using (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "draw_winners_select_admin"
+on public.draw_winners
+for select
+using (
+  exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+);
+
+create policy "profiles_select_admin"
+on public.profiles
+for select
+using (
+  exists (
+    select 1
+    from public.profiles p2
+    where p2.id = auth.uid() and p2.role = 'admin'
   )
 );

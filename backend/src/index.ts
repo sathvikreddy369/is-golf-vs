@@ -7,7 +7,7 @@ import { z } from "zod";
 import { env } from "./config.js";
 import { calculateMatchCount, generateWinningNumbers, mapMatchTier, splitPrizePool, type DrawMode } from "./draws.js";
 import { sendDrawPublishedNotifications, sendSubscriptionStatusEmail } from "./notifications.js";
-import { razorpay } from "./razorpay.js";
+import { getRazorpayClient, isRazorpayConfigured } from "./razorpay.js";
 import { supabaseAdmin } from "./supabase.js";
 
 const app = express();
@@ -165,6 +165,15 @@ app.post("/api/billing/create-subscription", async (req, res) => {
     });
   }
 
+  if (!isRazorpayConfigured() || !env.RAZORPAY_PLAN_MONTHLY_ID || !env.RAZORPAY_PLAN_YEARLY_ID) {
+    return res.status(503).json({ error: "Billing is not configured" });
+  }
+
+  const razorpay = getRazorpayClient();
+  if (!razorpay) {
+    return res.status(503).json({ error: "Billing is not configured" });
+  }
+
   const { userId, planInterval, totalCount } = parsed.data;
   const planId =
     planInterval === "monthly" ? env.RAZORPAY_PLAN_MONTHLY_ID : env.RAZORPAY_PLAN_YEARLY_ID;
@@ -200,7 +209,7 @@ app.post("/api/billing/create-subscription", async (req, res) => {
       subscriptionId: subscription.id,
       status: subscription.status,
       planInterval,
-      keyId: env.RAZORPAY_KEY_ID,
+      keyId: env.RAZORPAY_KEY_ID ?? null,
       shortUrl: subscription.short_url ?? null,
     });
   } catch (error) {
@@ -224,6 +233,15 @@ app.post("/api/charity/create-donation-link", async (req, res) => {
       error: "Invalid payload",
       details: parsed.error.flatten(),
     });
+  }
+
+  if (!isRazorpayConfigured()) {
+    return res.status(503).json({ error: "Donations are not configured" });
+  }
+
+  const razorpay = getRazorpayClient();
+  if (!razorpay) {
+    return res.status(503).json({ error: "Donations are not configured" });
   }
 
   const { userId, charityName, amountCents, email } = parsed.data;
@@ -592,6 +610,10 @@ function mapRazorpayStatus(rawStatus?: string) {
 }
 
 app.post("/api/billing/webhook", async (req, res) => {
+  if (!env.RAZORPAY_WEBHOOK_SECRET) {
+    return res.status(503).json({ error: "Webhook is not configured" });
+  }
+
   const signature = req.header("x-razorpay-signature");
   const rawBody = (req as express.Request & { rawBody?: Buffer }).rawBody;
 
